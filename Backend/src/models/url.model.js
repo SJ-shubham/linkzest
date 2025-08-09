@@ -17,6 +17,22 @@ const userSchema = new mongoose.Schema({
         type:mongoose.Schema.Types.ObjectId,    //This means the field will store the _id of a document from another model (or even the same model if needed).
         ref:'users',
     },
+    isActive:{
+        type:Boolean,
+        default:true,
+    },
+    expirationDate:{
+        type: Date, 
+        default: null 
+    },
+    isDeleted: { 
+        type: Boolean, 
+        default: false 
+    },
+    deletedAt: { 
+        type: Date, 
+        default: null 
+    },
 },
 {timestamps:true}
 );

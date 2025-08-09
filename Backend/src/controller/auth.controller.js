@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const {User} = require("../models/users.model");
 const {generateAccessToken,generateRefreshToken} = require("../service/auth.service"); // ✅ Import properly
 
+
 // Sign Up
 const handleUserSignUp = async (req, res) => {
   const { name, email, password } = req.body;
