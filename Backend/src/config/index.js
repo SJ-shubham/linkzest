@@ -1,15 +1,17 @@
 require('dotenv').config();
 
-require('dotenv').config();
-
-console.log('ACCESS_TOKEN_SECRET:', process.env.ACCESS_TOKEN_SECRET);
-console.log('REFRESH_TOKEN_SECRET:', process.env.REFRESH_TOKEN_SECRET);
-
 const config = {
+  // Server settings
   port: process.env.PORT || 3000,
-  dbUrl: process.env.DB_URL || 'mongodb://127.0.0.1:27017/short-url',
-  refreshSecret: process.env.REFRESH_TOKEN_SECRET,
-  accessSecret: process.env.ACCESS_TOKEN_SECRET
+  nodeEnv: process.env.NODE_ENV || 'development',
+  
+  // Database settings
+  dbUrl: process.env.DB_URL || ' mongodb://127.0.0.1:27017/short-url',
+  
+  // JWT secrets
+  refreshSecret: process.env.REFRESH_TOKEN_SECRET || 'refresh-secret-key-should-be-long-and-secure',
+  accessSecret: process.env.ACCESS_TOKEN_SECRET || 'access-secret-key-should-be-long-and-secure',
+  
 };
 
 module.exports = config;

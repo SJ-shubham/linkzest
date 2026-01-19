@@ -1,11 +1,19 @@
 const express = require('express');
-const {handleAdminPanel}=require('../controller/admin.controller.js');
-const {checkAuth,checkRole}=require('../middlewares/auth.middleware.js');
+const router = express.Router();
+const adminController = require('../controller/admin.controller');
 
-const adminRoutes = express.Router();
+// Dashboard
+router.get('/dashboard', adminController.handleAdminDashboard);
+router.get('/stats', adminController.handleSystemStats);
 
-adminRoutes.get('/dashboard', checkAuth, checkRole('admin'), handleAdminPanel);
+// User management
+router.get('/users', adminController.handleListUsers);
+router.get('/users/:userId', adminController.handleGetUserDetails);
+router.patch('/users/:userId', adminController.handleUpdateUser);
 
-module.exports={
-  adminRoutes,
-}
+// URL management
+router.get('/urls', adminController.handleListUrls);
+router.get('/urls/:urlId', adminController.handleGetUrlDetails);
+router.patch('/urls/:urlId', adminController.handleUpdateUrl);
+
+module.exports = router;

@@ -1,42 +1,44 @@
-const mongoose=require('mongoose');
+const mongoose = require('mongoose');
 
-const userSchema = new mongoose.Schema({
-    shortId: {
-        type:String,
-        required:true,
-        unique:true,
-    },
-    redirectURL:{
-        type:String,
-        required:true,
-    },
-    
-    visitHistory : [{timestamp:{type: Number}}], //This is an array of objects, where each object contains a timestamp (stored as a number, typically Unix time).
-    
-    createdBy: {
-        type:mongoose.Schema.Types.ObjectId,    //This means the field will store the _id of a document from another model (or even the same model if needed).
-        ref:'users',
-    },
-    isActive:{
-        type:Boolean,
-        default:true,
-    },
-    expirationDate:{
-        type: Date, 
-        default: null 
-    },
-    isDeleted: { 
-        type: Boolean, 
-        default: false 
-    },
-    deletedAt: { 
-        type: Date, 
-        default: null 
-    },
-},
-{timestamps:true}
-);
+const urlSchema = new mongoose.Schema({
+  shortId: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  redirectURL: {
+    type: String,
+    required: true,
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'user',   // Who created this short link
+    required: true,
+  },
+  folderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'folder', // Optional: Link belongs to a folder/campaign
+    default: null,
+  },
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+  expirationDate: {
+    type: Date,
+    default: null,
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+  },
+  deletedAt: {
+    type: Date,
+    default: null,
+  },
+}, { timestamps: true });
 
-const URL=mongoose.model('url',userSchema);  // Model reference for 'urls' collection using userSchema
 
-module.exports={URL};
+const URL = mongoose.model('url', urlSchema);
+
+module.exports = URL;

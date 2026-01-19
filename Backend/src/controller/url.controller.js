@@ -1,14 +1,27 @@
 const { nanoid } = require('nanoid');
-const { URL } = require('../models/url.model');
+const URL = require('../models/url.model');
+const Folder = require('../models/folder.model');
 
 const handleGenerateNewShortURL = async (req, res) => {
   try {
     const { redirectURL, customShortId } = req.body;
     const userId = req.user._id;
 
-    //Check if redirect URL is provided
+    // Check if redirect URL is provided
     if (!redirectURL) {
       return res.status(400).json({ error: 'Destination URL is required.' });
+    }
+
+    // Normalize URL to include protocol if missing
+    const normalizedURL = !redirectURL.match(/^[a-zA-Z]+:\/\//)
+      ? `https://${redirectURL}` 
+      : redirectURL;
+    
+    // Validate URL format (basic validation)
+    try {
+      new URL(normalizedURL);
+    } catch (err) {
+      return res.status(400).json({ error: 'Invalid URL format.' });
     }
 
     let finalShortId;
@@ -23,43 +36,43 @@ const handleGenerateNewShortURL = async (req, res) => {
         });
       }
 
-      // Check global uniqueness
-      const exists = await URL.findOne({ shortId: customShortId });
+      // Check global uniqueness with case-insensitive search
+      const exists = await URL.findOne({ 
+        shortId: { $regex: new RegExp(`^${customShortId}$`, 'i') } 
+      });
+      
       if (exists) {
         return res.status(400).json({ error: 'Custom short ID is already in use.' });
       }
 
       finalShortId = customShortId;
     } else {
-      //Generate unique random short ID
-      let isUnique = false;
-      let generatedId;
-
-      while (!isUnique) {
-        generatedId = nanoid(8);
-        const exists = await URL.findOne({ shortId: generatedId });
-        if (!exists) {
-          isUnique = true;
-        }
-      }
-
-      finalShortId = generatedId;
+      // Generate unique random short ID efficiently
+      finalShortId = await generateUniqueShortId();
     }
 
-    //Save the new short URL
-    const newUrl = await URL.create({
+    // Save the new short URL
+    const newUrl = new URL({
       shortId: finalShortId,
-      redirectURL: redirectURL,
-      visitHistory: [],
+      redirectURL: normalizedURL,
       createdBy: userId,
-      isActive: true,        // optional default
-      isDeleted: false,      // optional default
-      expirationDate: null,  // optional default
+      isActive: true,
+      isDeleted: false,
+      expirationDate: null,
+      createdAt: new Date(),
     });
 
+    await newUrl.save();
+
+    // Format and return response
+    const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:3000';
+    
     return res.status(201).json({
       message: 'Short URL created successfully',
-      data: newUrl,
+      data: {
+        ...newUrl.toObject(),
+        shortUrl: `${appBaseUrl}/${finalShortId}`
+      }
     });
 
   } catch (error) {
@@ -68,102 +81,35 @@ const handleGenerateNewShortURL = async (req, res) => {
   }
 };
 
-const handleRedirect = async (req, res) => {
-  try {
-    const { shortId } = req.params;
+/**
+ * Generate a unique short ID efficiently
+ */
+const generateUniqueShortId = async (length = 8) => {
+  let isUnique = false;
+  let generatedId;
 
-    const urlDoc = await URL.findOne({ shortId });
-
-    if (!urlDoc) {
-      return res.status(404).send('URL not found');
+  while (!isUnique) {
+    generatedId = nanoid(length);
+    // Use exists query for better performance
+    const exists = await URL.exists({ shortId: generatedId });
+    if (!exists) {
+      isUnique = true;
     }
-
-    //Check if link is deleted
-    if (urlDoc.isDeleted) {
-      return res.status(410).send('This link has been deleted.');
-    }
-
-    //Check if link is paused
-    if (!urlDoc.isActive) {
-      return res.status(403).send('This link is paused.');
-    }
-
-    //Check if link has expired
-    if (urlDoc.expirationDate && new Date() > urlDoc.expirationDate) {
-      return res.status(410).send('This link has expired.');
-    }
-
-    //Passed all checks — log visit
-    await URL.updateOne(
-      { _id: urlDoc._id },
-      {
-        $push: { visitHistory: { timestamp: new Date() } }
-      }
-    );
-
-    //Redirect to the original long URL
-    res.redirect(302, urlDoc.redirectURL);
-
-  } catch (error) {
-    console.error('Redirect error:', error);
-    res.status(500).send('Internal server error');
   }
+
+  return generatedId;
 };
-
-const handleAnalytics = async (req, res) => {
-  const userId = req.user._id;
-
-  try {
-    const urls = await URL.find({ createdBy: userId });
-
-    if (!urls || urls.length === 0) {
-      return res.status(404).json({ error: 'No URLs found for this user' });
-    }
-
-    const analytics = urls.map((url) => {
-      const totalVisits = url.visitHistory.length;
-      const lastVisited = totalVisits > 0
-        ? new Date(url.visitHistory[totalVisits - 1].timestamp)
-        : null;
-
-      const isExpired = url.expirationDate
-        ? new Date() > new Date(url.expirationDate)
-        : false;
-
-      return {
-        shortId: url.shortId,
-        shortUrl: `${process.env.BASE_URL || 'https://yourdomain.com'}/${url.shortId}`,
-        redirectURL: url.redirectURL,
-        createdAt: url.createdAt,
-        isActive: url.isActive,
-        isDeleted: url.isDeleted,
-        isExpired,
-        expirationDate: url.expirationDate || null,
-        totalVisits,
-        lastVisited,
-      };
-    });
-
-    return res.status(200).json({ message: 'Analytics fetched successfully', data: analytics });
-
-  } catch (error) {
-    console.error('Analytics error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
 
 const handleEditUrl = async (req, res) => {
   const { shortId } = req.params;
   const userId = req.user._id;
-  const { newDestinationUrl, newCustomShortID, expirationDate } = req.body;
+  const { newDestinationUrl, newCustomShortID, expirationDate, folderId } = req.body;
 
   try {
     const urlDoc = await URL.findOne({ shortId, createdBy: userId });
     if (!urlDoc) {
       return res.status(404).json({ error: 'URL not found' });
     }
-
     // Update destination URL
     if (newDestinationUrl) {
       urlDoc.redirectURL = newDestinationUrl;
@@ -178,7 +124,7 @@ const handleEditUrl = async (req, res) => {
         });
       }
 
-      const exists = await URL.findOne({ shortId: newCustomShortID });
+      const exists = await URL.exists({ shortId: newCustomShortID });
       if (exists) {
         return res.status(400).json({ error: 'Short ID already in use' });
       }
@@ -195,11 +141,40 @@ const handleEditUrl = async (req, res) => {
       urlDoc.expirationDate = date;
     }
 
+// --- Handle Folder 
+    if (folderId !== undefined && urlDoc.folder?.toString() !== folderId) {
+        // Unassign from the current folder (if one exists)
+        if (urlDoc.folderId) {
+          await Folder.updateOne(
+            { _id: urlDoc.folderId, createdBy: userId },
+            { $pull: { urls: urlDoc._id } }
+          );
+        }
+
+        if (folderId) {
+          // Check if target folder exists and belongs to user
+          const targetFolder = await Folder.findOne({ _id: folderId, createdBy: userId });
+          if (!targetFolder) {
+            return res.status(404).json({ error: 'Target folder not found or unauthorized.' });
+          }
+
+          // Add URL to the new folder and update the URL document
+          await Folder.updateOne(
+            { _id: folderId, createdBy: userId },
+            { $addToSet: { urls: urlDoc._id } }
+          );
+          urlDoc.folderId = folderId;
+        } else {
+          // If folderId is null/empty/undefined, unassign folder
+          urlDoc.folderId = null;
+        }
+    }
+
     await urlDoc.save();
 
-    res.status(200).json({ message: 'URL updated successfully', data: urlDoc });
+    return res.status(200).json({ message: 'URL updated successfully', data: urlDoc });
   } catch (error) {
-    console.error(error);
+    console.error('Error editing URL:', error);
     res.status(500).json({ error: 'Internal server error.' });
   }
 };
@@ -235,7 +210,7 @@ const handleUrlStatus=async(req,res)=>{
   }
 };
 
-const handleDeleteMode = async (req, res) => {
+const handleDeleteUrl = async (req, res) => {
   const { shortId } = req.params;
   const { mode } = req.body;
   const userId = req.user._id;
@@ -274,11 +249,38 @@ const handleDeleteMode = async (req, res) => {
   }
 };
 
+const handleListUserUrls = async (req, res) => {
+  try {
+    // The userId comes from `checkAuth` middleware (decoded JWT)
+    const userId = req.user._id;
+
+    // Fetch all URLs created by this user (exclude trashed by default)
+    const urls = await URL.find({
+      createdBy: userId,
+      isDeleted: false
+    })
+      .select('-__v') // exclude version key
+      .sort({ createdAt: -1 }); // latest first
+
+    return res.status(200).json({
+      message: 'URLs fetched successfully',
+      count: urls.length,
+      data: urls,
+    });
+  } catch (error) {
+    console.error('Error fetching user URLs:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+    });
+  }
+};
+
+module.exports = { handleListUserUrls };
+
 module.exports = {
   handleGenerateNewShortURL,
-  handleRedirect,
-  handleAnalytics,
   handleEditUrl,
   handleUrlStatus,
-  handleDeleteMode
+  handleDeleteUrl,
+  handleListUserUrls,
 };

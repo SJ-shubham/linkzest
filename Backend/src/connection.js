@@ -1,4 +1,7 @@
 const mongoose = require('mongoose');
+const config = require('./config/index');
+
+const url=config.dbUrl;
 
 // Connect to MongoDB and handle connection errors
 const connectMongoDB = async (url) => {

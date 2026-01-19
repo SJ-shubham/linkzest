@@ -1,110 +1,230 @@
 const bcrypt = require("bcrypt");
-const {User} = require("../models/users.model");
-const {generateAccessToken,generateRefreshToken} = require("../service/auth.service"); // ✅ Import properly
+const User = require("../models/users.model");
+const { generateAccessToken, generateRefreshToken } = require("../service/auth.service");
 
-
-// Sign Up
+/**
+ * User registration handler
+ * @route POST /api/auth/signup
+ */
 const handleUserSignUp = async (req, res) => {
-  const { name, email, password } = req.body;
-
-  if (!name || !email || !password) {
-    return res.status(400).json({
-      message: "Bad Request: Neccesary marked fields are required"
-  });
-  }
+  const { name, email, password, username } = req.body;
 
   try {
-    const existingUser = await User.findOne({ email });
-
-    if (existingUser) {
-      return res.status(403).json({
-                message: "Forbidden: User already exist."
-            });
+    // Input validation
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email, and password are required"
+      });
     }
 
-    const saltRound=await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password,saltRound);
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email format"
+      });
+    }
 
-    const user=await User.create({
-      name,
-      email: email.toLowerCase(),
+    // Password strength validation
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters long"
+      });
+    }
+
+    // Check for existing user with the same email
+    const existingEmail = await User.findOne({ email: email.toLowerCase() });
+    if (existingEmail) {
+      return res.status(409).json({
+        success: false,
+        message: "Email is already registered"
+      });
+    }
+
+    // Check for existing username if provided
+    if (username) {
+      const existingUsername = await User.findOne({ username });
+      if (existingUsername) {
+        return res.status(409).json({
+          success: false,
+          message: "Username is already taken"
+        });
+      }
+    }
+
+    // Hash password with appropriate cost factor
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create new user
+    const user = await User.create({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      username: username?.trim() || email.split('@')[0],
       password: hashedPassword,
+      role: "user",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
-    if(!user) return res.status(500).json({message:"user creation failed"});
-    return res.status(201).json({message:'user created successfully'});
+
+    // Generate tokens but don't set them on signup
+    // This is a design choice - require explicit login after signup
+    
+    return res.status(201).json({
+      success: true,
+      message: "Account created successfully",
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        username: user.username
+      }
+    });
   } catch (error) {
     console.error("Signup Error:", error);
-    return res.status(500).json({ error: "Internal Server Error" });
+    return res.status(500).json({ 
+      success: false,
+      message: "Internal server error" 
+    });
   }
 };
 
+/**
+ * User login handler
+ * @route POST /api/auth
+ */
 const handleUserLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Input validation
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required." });
+      return res.status(400).json({ 
+        success: false,
+        message: "Email and password are required" 
+      });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    // Find user by email (case insensitive)
+    const user = await User.findOne({ 
+      email: email.toLowerCase().trim() 
+    });
 
+    // User not found
     if (!user) {
-      return res.status(401).json({ message: "Email or password is invalid." });
+      return res.status(401).json({ 
+        success: false,
+        message: "Invalid credentials" 
+      });
     }
 
-    const isValid = await bcrypt.compare(password, user.password);
-
-    if (!isValid) {
-      return res.status(401).json({ message: "Email or password is invalid." });
+    // Check if account is active
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Account is inactive. Please contact support."
+      });
     }
 
-    console.log(`User login: ${email}, Valid password: ${isValid}`);
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ 
+        success: false,
+        message: "Invalid credentials" 
+      });
+    }
 
+    // Generate tokens
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    res.cookie("accessToken", accessToken, {
+    // Update last login timestamp
+    await User.updateOne(
+      { _id: user._id },
+      { 
+        $set: { 
+          lastLogin: new Date(),
+        }
+      }
+    );
+
+    // Set secure cookies
+    const cookieOptions = {
       httpOnly: true,
-      // secure: process.env.NODE_ENV === 'production',
-      // sameSite: 'Strict',
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/'
+    };
+
+    // Set access token cookie (short-lived)
+    res.cookie("accessToken", accessToken, {
+      ...cookieOptions,
       maxAge: 15 * 60 * 1000, // 15 minutes
     });
 
+    // Set refresh token cookie (long-lived)
     res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      // secure: process.env.NODE_ENV === 'production',
-      // sameSite: 'Strict',
+      ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
+    // Return user data (without sensitive information)
     return res.status(200).json({
-      user: {
+      success: true,
+      message: "Login successful",
+      data: {
         id: user._id,
         email: user.email,
         name: user.name,
-      },
-      message: "Login successful",
+        username: user.username,
+        role: user.role
+      }
     });
   } catch (error) {
-    console.error("Login Error:", error.message);
-    return res.status(500).json({ message: "Internal Server Error" });
+    console.error("Login Error:", error);
+    return res.status(500).json({ 
+      success: false,
+      message: "Internal server error" 
+    });
   }
 };
 
-// Logout
+/**
+ * User logout handler
+ * @route GET /api/auth
+ */
 const handleUserLogout = (req, res) => {
-  try{
-  res.clearCookie("accessToken");
-  res.clearCookie("refreshToken");
-  return res.status(200).json({
-            message: "Logout successful, cookies cleared"
-        });
-  }catch(error){
-     return res.status(500).json({
-            message: `Error at Logout -> ${error.message}`
-        });
+  try {
+    // Get the cookie options to match what was set during login
+    const cookieOptions = {
+      httpOnly: true,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/'
+    };
+    
+    // Clear both cookies
+    res.clearCookie("accessToken", cookieOptions);
+    res.clearCookie("refreshToken", cookieOptions);
+
+    return res.status(200).json({
+      success: true,
+      message: "Logout successful"
+    });
+  } catch (error) {
+    console.error("Logout Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error processing logout request"
+    });
   }
 };
+
 
 module.exports = {
   handleUserSignUp,

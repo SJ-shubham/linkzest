@@ -1,18 +1,26 @@
-const express= require('express');
-const urlRouter=express.Router();
-const {handleGenerateNewShortURL,
-       handleAnalytics,handleEditUrl,
-       handleUrlStatus,
-       handleDeleteMode} =require('../controller/url.controller');
+const express = require('express');
+const urlRouter = express.Router();
+const { 
+  handleGenerateNewShortURL,
+  handleListUserUrls,
+  handleEditUrl,
+  handleUrlStatus,
+  handleDeleteUrl
+} = require('../controller/url.controller');
 
+// Create a new short URL (custom/random)
 urlRouter.post('/',handleGenerateNewShortURL);
 
-urlRouter.get('/analytics',handleAnalytics);
+// List all URLs created by the logged-in user
+urlRouter.get('/',handleListUserUrls);
 
+// Edit URL (destination, custom shortId, expiration, folder assignment)
 urlRouter.patch('/:shortId/edit',handleEditUrl);
 
+// Update URL status (activate/deactivate)
 urlRouter.patch('/:shortId/status',handleUrlStatus);
 
-urlRouter.patch(':shortId/delete',handleDeleteMode);
+// Move URL to trash or delete permanently
+urlRouter.delete('/:shortId', handleDeleteUrl);
 
 module.exports=urlRouter;
