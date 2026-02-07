@@ -7,53 +7,79 @@ const User = require("../models/users.model");
  */
 const checkAuth = async (req, res, next) => {
   try {
-    const accessToken = req.cookies?.accessToken;
+    // Get token from cookies or Authorization header
+    const accessToken =
+      req.cookies?.accessToken ||
+      req.headers["authorization"]?.split(" ")[1];
 
     if (!accessToken) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: "Authentication required" 
+        message: "Authentication required",
       });
     }
 
-    const { valid, payload } = verifyAccessToken(accessToken);
+    // Verify token
+    const { valid, payload, error } = verifyAccessToken(accessToken);
 
-    if (!valid || !payload) {
-      return res.status(401).json({ 
+    if (!valid || !payload?.id) {
+      return res.status(401).json({
         success: false,
-        message: "Invalid or expired session" 
+        message: "Invalid or expired session",
       });
     }
 
-    // Set user object on request
-    req.user = payload;
+    // Fetch user from DB (exclude password)
+    const user = await User.findById(payload.id).select("-password");
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Attach user to request object
+    req.user = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
+
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
-    return res.status(500).json({ 
+    console.error("Auth middleware error:", error);
+    return res.status(500).json({
       success: false,
-      message: "Authentication error" 
+      message: "Authentication error",
     });
   }
 };
 
-
+/**
+ * Role-based authorization middleware
+ * @param {String|Array} roles - Single role or array of allowed roles
+ */
 const checkRole = (roles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: "Authentication required" 
+        message: "Authentication required",
       });
     }
-    
-    if (!acceptableRoles.includes(req.user.role)) {
-      return res.status(403).json({ 
+
+    // Convert single role to array for consistent handling
+    const allowedRoles = Array.isArray(roles) ? roles : [roles];
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
         success: false,
-        message: "Insufficient permissions" 
+        message: "Insufficient permissions",
       });
     }
-    
+
     next();
   };
 };

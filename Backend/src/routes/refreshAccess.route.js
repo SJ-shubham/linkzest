@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { handleRefreshToken } = require("../controller/refreshToken.controller");
 
-router.get("-access/", handleRefreshToken);
+// GET /api/refresh - Refresh access token
+router.get("/", handleRefreshToken);
 
 module.exports = router;

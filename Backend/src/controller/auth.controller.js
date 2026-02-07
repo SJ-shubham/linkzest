@@ -7,14 +7,14 @@ const { generateAccessToken, generateRefreshToken } = require("../service/auth.s
  * @route POST /api/auth/signup
  */
 const handleUserSignUp = async (req, res) => {
-  const { name, email, password, username } = req.body;
+  const { name, email, password } = req.body;
 
   try {
     // Input validation
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Name, email, and password are required"
+        message: "Name, email, and password are required",
       });
     }
 
@@ -23,7 +23,7 @@ const handleUserSignUp = async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid email format"
+        message: "Invalid email format",
       });
     }
 
@@ -31,28 +31,17 @@ const handleUserSignUp = async (req, res) => {
     if (password.length < 8) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 8 characters long"
+        message: "Password must be at least 8 characters long",
       });
     }
 
     // Check for existing user with the same email
-    const existingEmail = await User.findOne({ email: email.toLowerCase() });
-    if (existingEmail) {
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
       return res.status(409).json({
         success: false,
-        message: "Email is already registered"
+        message: "Email is already registered",
       });
-    }
-
-    // Check for existing username if provided
-    if (username) {
-      const existingUsername = await User.findOne({ username });
-      if (existingUsername) {
-        return res.status(409).json({
-          success: false,
-          message: "Username is already taken"
-        });
-      }
     }
 
     // Hash password with appropriate cost factor
@@ -63,17 +52,10 @@ const handleUserSignUp = async (req, res) => {
     const user = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
-      username: username?.trim() || email.split('@')[0],
       password: hashedPassword,
       role: "user",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
     });
 
-    // Generate tokens but don't set them on signup
-    // This is a design choice - require explicit login after signup
-    
     return res.status(201).json({
       success: true,
       message: "Account created successfully",
@@ -81,21 +63,20 @@ const handleUserSignUp = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        username: user.username
-      }
+      },
     });
   } catch (error) {
     console.error("Signup Error:", error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
-      message: "Internal server error" 
+      message: "Internal server error",
     });
   }
 };
 
 /**
  * User login handler
- * @route POST /api/auth
+ * @route POST /api/auth/login
  */
 const handleUserLogin = async (req, res) => {
   try {
@@ -103,39 +84,31 @@ const handleUserLogin = async (req, res) => {
 
     // Input validation
     if (!email || !password) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Email and password are required" 
+        message: "Email and password are required",
       });
     }
 
     // Find user by email (case insensitive)
-    const user = await User.findOne({ 
-      email: email.toLowerCase().trim() 
+    const user = await User.findOne({
+      email: email.toLowerCase().trim(),
     });
 
     // User not found
     if (!user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: "Invalid credentials" 
-      });
-    }
-
-    // Check if account is active
-    if (!user.isActive) {
-      return res.status(403).json({
-        success: false,
-        message: "Account is inactive. Please contact support."
+        message: "Invalid credentials",
       });
     }
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: "Invalid credentials" 
+        message: "Invalid credentials",
       });
     }
 
@@ -143,22 +116,12 @@ const handleUserLogin = async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    // Update last login timestamp
-    await User.updateOne(
-      { _id: user._id },
-      { 
-        $set: { 
-          lastLogin: new Date(),
-        }
-      }
-    );
-
     // Set secure cookies
     const cookieOptions = {
       httpOnly: true,
       sameSite: 'strict',
       secure: process.env.NODE_ENV === 'production',
-      path: '/'
+      path: '/',
     };
 
     // Set access token cookie (short-lived)
@@ -179,24 +142,23 @@ const handleUserLogin = async (req, res) => {
       message: "Login successful",
       data: {
         id: user._id,
-        email: user.email,
         name: user.name,
-        username: user.username,
-        role: user.role
-      }
+        email: user.email,
+        role: user.role,
+      },
     });
   } catch (error) {
     console.error("Login Error:", error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
-      message: "Internal server error" 
+      message: "Internal server error",
     });
   }
 };
 
 /**
  * User logout handler
- * @route GET /api/auth
+ * @route GET /api/auth/logout
  */
 const handleUserLogout = (req, res) => {
   try {
@@ -205,26 +167,25 @@ const handleUserLogout = (req, res) => {
       httpOnly: true,
       sameSite: 'strict',
       secure: process.env.NODE_ENV === 'production',
-      path: '/'
+      path: '/',
     };
-    
+
     // Clear both cookies
     res.clearCookie("accessToken", cookieOptions);
     res.clearCookie("refreshToken", cookieOptions);
 
     return res.status(200).json({
       success: true,
-      message: "Logout successful"
+      message: "Logout successful",
     });
   } catch (error) {
     console.error("Logout Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Error processing logout request"
+      message: "Error processing logout request",
     });
   }
 };
-
 
 module.exports = {
   handleUserSignUp,

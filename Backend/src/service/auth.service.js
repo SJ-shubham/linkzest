@@ -16,7 +16,6 @@ const generateAccessToken = (user) => {
       id: user._id,
       email: user.email,
       name: user.name,
-      username: user.username,
       role: user.role || 'user',
     },
     accessSecret,

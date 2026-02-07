@@ -3,23 +3,18 @@ const mongoose = require('mongoose');
 const folderSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true,       // e.g., "College Projects" or "Marketing Campaign"
+    required: true,
     trim: true,
   },
   description: {
     type: String,
-    default: "",
+    default: '',
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'user',          // Folder belongs to a user
+    ref: 'user',
     required: true,
   },
-  urls: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'url',           // Array of short URLs in this folder
-  }],
-  // 🔹 New fields for soft delete support
   isDeleted: {
     type: Boolean,
     default: false,
@@ -27,7 +22,7 @@ const folderSchema = new mongoose.Schema({
   deletedAt: {
     type: Date,
     default: null,
-  }
+  },
 }, { timestamps: true });
 
 const Folder = mongoose.model('folder', folderSchema);

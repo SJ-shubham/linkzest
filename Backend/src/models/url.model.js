@@ -6,18 +6,23 @@ const urlSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  title: {
+    type: String,
+    default: null,
+    trim: true,
+  },
   redirectURL: {
     type: String,
     required: true,
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'user',   // Who created this short link
+    ref: 'user',
     required: true,
   },
   folderId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'folder', // Optional: Link belongs to a folder/campaign
+    ref: 'folder',
     default: null,
   },
   isActive: {
@@ -37,7 +42,6 @@ const urlSchema = new mongoose.Schema({
     default: null,
   },
 }, { timestamps: true });
-
 
 const URL = mongoose.model('url', urlSchema);
 

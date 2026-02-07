@@ -1,26 +1,34 @@
 const express = require('express');
 const urlRouter = express.Router();
-const { 
-  handleGenerateNewShortURL,
+const {
+  handleCreateShortURL,
   handleListUserUrls,
   handleEditUrl,
-  handleUrlStatus,
-  handleDeleteUrl
+  handleToggleUrlStatus,
+  handleSoftDeleteUrl,
+  handleRestoreUrl,
+  handlePermanentDeleteUrl,
 } = require('../controller/url.controller');
 
-// Create a new short URL (custom/random)
-urlRouter.post('/',handleGenerateNewShortURL);
+// POST /api/url - Create a new short URL
+urlRouter.post('/', handleCreateShortURL);
 
-// List all URLs created by the logged-in user
-urlRouter.get('/',handleListUserUrls);
+// GET /api/url - List all URLs (with pagination, search, filters)
+urlRouter.get('/', handleListUserUrls);
 
-// Edit URL (destination, custom shortId, expiration, folder assignment)
-urlRouter.patch('/:shortId/edit',handleEditUrl);
+// PATCH /api/url/:shortId/edit - Edit URL details
+urlRouter.patch('/:shortId/edit', handleEditUrl);
 
-// Update URL status (activate/deactivate)
-urlRouter.patch('/:shortId/status',handleUrlStatus);
+// PATCH /api/url/:shortId/status - Toggle URL active/inactive status
+urlRouter.patch('/:shortId/status', handleToggleUrlStatus);
 
-// Move URL to trash or delete permanently
-urlRouter.delete('/:shortId', handleDeleteUrl);
+// DELETE /api/url/:shortId - Soft delete (move to recycle bin)
+urlRouter.delete('/:shortId', handleSoftDeleteUrl);
 
-module.exports=urlRouter;
+// PATCH /api/url/:shortId/restore - Restore URL from recycle bin
+urlRouter.patch('/:shortId/restore', handleRestoreUrl);
+
+// DELETE /api/url/:shortId/permanent - Permanently delete URL
+urlRouter.delete('/:shortId/permanent', handlePermanentDeleteUrl);
+
+module.exports = urlRouter;

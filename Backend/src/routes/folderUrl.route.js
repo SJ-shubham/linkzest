@@ -1,20 +1,38 @@
-const express=require('express');
-const folderRouter=express.Router();
+const express = require('express');
+const folderRouter = express.Router();
 const {
-    handleCreateFolder,
-    handleEditFolder,
-    handleDeleteFolder,
-    handleListFolders,
-    handleGetFolderDetails}=require('../controller/folderUrl.controller');
+  handleCreateFolder,
+  handleListFolders,
+  handleGetFolderDetails,
+  handleEditFolder,
+  handleSoftDeleteFolder,
+  handleRemoveUrlsFromFolder,
+  handleRestoreFolder,
+  handlePermanentDeleteFolder,
+} = require('../controller/folderUrl.controller');
 
-folderRouter.post('/', handleCreateFolder);    // Create a new folder/campaign
+// POST /api/folder - Create a new folder
+folderRouter.post('/', handleCreateFolder);
 
-folderRouter.get('/', handleListFolders);    // List all folders for the logged-in user
+// GET /api/folder - List all folders for the logged-in user
+folderRouter.get('/', handleListFolders);
 
-folderRouter.get('/:folderId', handleGetFolderDetails);    // Get details of one folder + URLs inside it
+// GET /api/folder/:folderId - Get folder details with URLs inside
+folderRouter.get('/:folderId', handleGetFolderDetails);
 
-folderRouter.patch('/:folderId', handleEditFolder);    // Edit folder (rename, description, etc.)
+// PATCH /api/folder/:folderId - Edit folder (name, description)
+folderRouter.patch('/:folderId', handleEditFolder);
 
-folderRouter.delete('/:folderId', handleDeleteFolder);    // Delete a folder (optionally move URLs to trash or orphan them)
+// DELETE /api/folder/:folderId - Soft delete folder (URLs become orphaned)
+folderRouter.delete('/:folderId', handleSoftDeleteFolder);
 
-module.exports=folderRouter;
+// PATCH /api/folder/:folderId/remove-urls - Remove URLs from folder (bulk)
+folderRouter.patch('/:folderId/remove-urls', handleRemoveUrlsFromFolder);
+
+// PATCH /api/folder/:folderId/restore - Restore folder from recycle bin
+folderRouter.patch('/:folderId/restore', handleRestoreFolder);
+
+// DELETE /api/folder/:folderId/permanent - Permanently delete folder
+folderRouter.delete('/:folderId/permanent', handlePermanentDeleteFolder);
+
+module.exports = folderRouter;

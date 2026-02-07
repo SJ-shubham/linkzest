@@ -1,9 +1,18 @@
-const express=require('express');
-const {handleExportUrlAnalytics,handleGetUrlAnalytics} = require('../controller/analyticsUrl.controller');
-const analyticsRouter=express.Router();
+const express = require('express');
+const analyticsRouter = express.Router();
+const {
+  handleGetUrlOverview,
+  handleGetChartsData,
+  handleGetVisitHistory,
+} = require('../controller/analyticsUrl.controller');
 
-analyticsRouter.get('/:shortId', handleGetUrlAnalytics);    // Get analytics for a specific URL (visits, trends, geo, device, referrer)
+// GET /api/analytics/:shortId/overview - High-level analytics overview
+analyticsRouter.get('/:shortId/overview', handleGetUrlOverview);
 
-analyticsRouter.get('/:shortId/export', handleExportUrlAnalytics);    // Export analytics for a specific URL (CSV/Excel)
+// GET /api/analytics/:shortId/charts - Aggregated analytics for charts
+analyticsRouter.get('/:shortId/charts', handleGetChartsData);
 
-module.exports=analyticsRouter;
+// GET /api/analytics/:shortId/visits - Paginated visit history
+analyticsRouter.get('/:shortId/visits', handleGetVisitHistory);
+
+module.exports = analyticsRouter;

@@ -3,32 +3,32 @@ const mongoose = require('mongoose');
 const visitHistorySchema = new mongoose.Schema({
   urlId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'url',   // Reference to the URL document
+    ref: 'url',
     required: true,
-    index: true,  // Faster lookups when querying visits for a given URL
+    index: true,
   },
   visitorIP: {
-    type: String, // Store raw IP (could be anonymized if needed)
+    type: String,
   },
   deviceType: {
-    type: String, // e.g., 'desktop', 'mobile', 'tablet'
+    type: String,
   },
   userAgent: {
-    type: String, // Full UA string (optional, useful for later parsing)
+    type: String,
   },
   referrer: {
-    type: String, // e.g., "https://google.com"
+    type: String,
   },
   country: {
-    type: String, // e.g., "India"
+    type: String,
   },
   city: {
-    type: String, // e.g., "Bangalore"
+    type: String,
   },
   timestamp: {
     type: Date,
-    default: Date.now, // Record time of visit
-    index: true,       // Useful for time-based analytics queries
+    default: Date.now,
+    index: true,
   },
 }, { timestamps: true });
 
